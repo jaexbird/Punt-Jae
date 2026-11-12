@@ -7,6 +7,7 @@ public class EnemyHurtbox : MonoBehaviour
     [SerializeField] private int maxHealth = 100;
     [SerializeField] private float hitstunDuration = 0.45f;
     [SerializeField] private SpriteRenderer enemySprite;
+    [ColorUsage(true, true)]
     [SerializeField] private Color hitFlashColor = Color.red;
     [SerializeField] private float hitFlashDuration = 0.1f;
 
@@ -17,18 +18,19 @@ public class EnemyHurtbox : MonoBehaviour
     private int currentHealth;
     private float hitstunTimer;
     private Rigidbody rb;
-    private Color originalColor;
     private Coroutine flashCoroutine;
+    private MaterialPropertyBlock propBlock;
+
+    private static readonly int FlashColorId = Shader.PropertyToID("_FlashColor");
+    private static readonly int FlashAmountId = Shader.PropertyToID("_FlashAmount");
 
     private void Awake()
     {
         currentHealth = maxHealth;
         rb = GetComponent<Rigidbody>();
+        propBlock = new MaterialPropertyBlock();
 
-        if (enemySprite != null)
-        {
-            originalColor = enemySprite.color;
-        }
+        SetFlashAmount(0f);
     }
 
     private void Update()
@@ -66,22 +68,41 @@ public class EnemyHurtbox : MonoBehaviour
 
     public void ResetSpriteColor()
     {
-        if (enemySprite != null)
+        if (flashCoroutine != null)
         {
-            enemySprite.color = originalColor;
+            StopCoroutine(flashCoroutine);
+            flashCoroutine = null;
         }
+        SetFlashAmount(0f);
     }
 
     private IEnumerator FlashSprite()
     {
-        enemySprite.color = hitFlashColor;
+        SetFlashAmount(1f);
         yield return new WaitForSeconds(hitFlashDuration);
-        enemySprite.color = originalColor;
+        SetFlashAmount(0f);
+        flashCoroutine = null;
+    }
+
+    private void SetFlashAmount(float amount)
+    {
+        if (enemySprite == null) return;
+
+        if (propBlock == null) propBlock = new MaterialPropertyBlock();
+
+        enemySprite.GetPropertyBlock(propBlock);
+        propBlock.SetColor(FlashColorId, hitFlashColor);
+        propBlock.SetFloat(FlashAmountId, amount);
+        enemySprite.SetPropertyBlock(propBlock);
+    }
+
+    private void OnDisable()
+    {
+        SetFlashAmount(0f);
     }
 
     private void Die()
     {
-
         OnEnemyDied?.Invoke(this);
         Destroy(gameObject);
     }
